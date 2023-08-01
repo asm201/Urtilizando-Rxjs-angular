@@ -1,6 +1,7 @@
+import { LivrosResultado } from './../../models/interfaces';
 import { Component, OnDestroy } from '@angular/core';
 import { FormControl } from '@angular/forms';
-import { Subscription, debounceTime, distinctUntilChanged, filter, map, switchMap } from 'rxjs';
+import { EMPTY, Subscription, catchError, debounceTime, distinctUntilChanged, filter, map, of, switchMap, throwError } from 'rxjs';
 import { Item, Livro } from 'src/app/models/interfaces';
 import { LivroVolumeInfo } from 'src/app/models/livroVolumeInfo';
 import { LivroService } from 'src/app/service/livro.service';
@@ -18,15 +19,42 @@ export class ListaLivrosComponent{
   campoBusca = new FormControl()
   //subscription: Subscription
   //livro: Livro
+  mensgemErro = ''
+  livrosResultado: LivrosResultado
 
   constructor(private service: LivroService) { }
+
+
+  totalDeLivros$ = this.campoBusca.valueChanges.pipe(
+    debounceTime(PAUSA),
+    filter((valorDigitado) => valorDigitado.length >= 3),
+    distinctUntilChanged(),
+    switchMap((valorDigitado) => this.service.buscar(valorDigitado)),
+    map(resultado => this.livrosResultado = resultado),
+    catchError(erro => {
+      console.log(erro);
+      return of()
+    })
+  )
 
   livrosEncontrados$ = this.campoBusca.valueChanges.pipe(
     debounceTime(PAUSA),
     filter((valorDigitado) => valorDigitado.length >= 3),
     distinctUntilChanged(),
     switchMap((valorDigitado) => this.service.buscar(valorDigitado)),
-    map((items) => this.livrosResultadoParaLivros(items))
+    map(resultado => this.livrosResultado = resultado),
+    map(resultado => resultado.items ?? []),
+    map((items) => this.livrosResultadoParaLivros(items)),
+    //catchError(() => {
+    //    this.mensgemErro = 'Ops, ocorreu um erro, Recarregando a aplicação!'
+    //    return EMPTY
+     // }
+    //)
+    catchError(erro => {
+     console.log(erro)
+      return throwError(() => new Error(this.mensgemErro = 'Ops, ocorreu um erro, Recarregando a aplicação!'))
+      }
+    )
   )
 
 /*
